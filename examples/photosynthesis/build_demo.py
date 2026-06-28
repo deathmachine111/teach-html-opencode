@@ -1,8 +1,14 @@
-"""teach-html-opencode end-to-end demo.
+"""teach-html-opencode end-to-end demo (v1.1).
 
 Reads examples/photosynthesis/teach-html-src/ch01.md, injects diagrams
-(mermaid + image + chart), builds the HTML, validates it, and prints
-a per-model token cost report in USD and INR.
+(mermaid + image + chart, every 2 paragraphs = 6 slots), builds the HTML,
+validates it, and prints a per-model token cost report in USD and INR.
+
+v1.1 changes:
+  - diagram density: every 2 paragraphs (was every 3)
+  - images: labeled journal figures with named parts and callouts
+  - 6 diagram slots, mixed types (mermaid / image / chart)
+  - ch01.md rewritten in tables+bullets-first style
 
 Run from the project root:
     python3 examples/photosynthesis/build_demo.py
@@ -11,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -24,35 +31,16 @@ sys.path.insert(0, str(SKILL / "scripts"))
 
 from inject_diagrams import inject_diagrams, mermaid_ensure_local  # noqa: E402
 
-# USD -> INR rate (as of session; pinned for the report)
 USD_INR = 83.0
 
 
-def openrouter_chat(prompt: str, model: str, key: str) -> dict:
-    """Minimal openrouter chat call. Returns parsed JSON."""
-    body = json.dumps({
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-    }).encode()
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=body,
-        headers={
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())
-
-
-# ---------- demo LLM spec picker ------------------------------------------
-# Hand-curated specs for the 3 slots. Cycles through all 3 diagram types
-# so the demo exercises every renderer.
+# ---------- 6 hand-curated specs (v1.1) ------------------------------------
+# Cycled through the 6 doublet slots. Mix of all 3 render types.
+# Image specs use the v1.1 style suffix: labeled journal figures with
+# named parts and callouts (no more "no text, no labels").
 
 DEMO_SPECS = [
-    {  # after paragraph 2 — process flowchart
+    {
         "type": "mermaid",
         "content": (
             "flowchart LR\n"
@@ -67,17 +55,33 @@ DEMO_SPECS = [
         ),
         "alt": "Two-stage photosynthesis: light reactions split water and produce ATP/NADPH, which power the Calvin-Benson cycle to fix CO2 into sugar.",
     },
-    {  # after paragraph 5 — image of chloroplast
+    {
         "type": "image",
         "content": (
-            "cross-section of a plant chloroplast showing outer membrane, inner "
-            "membrane, stroma, and a stack of thylakoid membranes called a granum, "
-            "flat 2D editorial illustration, no text, no labels, no letters, no "
-            "watermark, no background detail, white background, 1:1"
+            "labeled cross-section diagram of a plant chloroplast with named parts: "
+            "outer membrane, inner membrane, stroma, thylakoid stack (granum), "
+            "stroma lamellae, thylakoid lumen, with arrows pointing to each label, "
+            "flat 2D editorial medical illustration, clean line art, white background, "
+            "no watermark, 1:1"
         ),
-        "alt": "Chloroplast cross-section with thylakoid stacks (grana) embedded in the stroma, enclosed by inner and outer membranes.",
+        "alt": "Labeled cross-section of a plant chloroplast with thylakoid stacks (grana) embedded in the stroma, enclosed by inner and outer membranes.",
     },
-    {  # after paragraph 8 — absorption spectrum chart
+    {
+        "type": "mermaid",
+        "content": (
+            "flowchart LR\n"
+            "  CO2[CO2] --> Fix[1. Carbon fixation]\n"
+            "  Fix -->|3-PGA| Red[2. Reduction]\n"
+            "  Red -->|G3P| Reg[3. Regeneration]\n"
+            "  Reg -->|RuBP| Fix\n"
+            "  Red -->|G3P| Out[Glucose + biomass]\n"
+            "  ATP[ATP] --> Red\n"
+            "  ATP --> Reg\n"
+            "  NADPH[NADPH] --> Red"
+        ),
+        "alt": "Three-stage Calvin-Benson cycle: CO2 fixation by RuBisCO produces 3-PGA, which is reduced to G3P using ATP and NADPH; some G3P exits as sugar while the rest regenerates RuBP using more ATP.",
+    },
+    {
         "type": "chart",
         "content": json.dumps({
             "kind": "line",
@@ -87,64 +91,74 @@ DEMO_SPECS = [
         }),
         "alt": "Line chart showing chlorophyll absorption peaks in the blue (~430 nm) and red (~660 nm) regions, with a green trough in between.",
     },
+    {
+        "type": "image",
+        "content": (
+            "side-by-side labeled comparison of C3 and C4 leaf cross-sections: "
+            "C3 leaf labeled with mesophyll cells, palisade, spongy mesophyll, "
+            "vascular bundle; C4 leaf labeled with mesophyll cells, bundle-sheath "
+            "cells around the vascular bundle, Kranz anatomy highlighted, "
+            "flat 2D editorial medical illustration, clean line art, "
+            "white background, no watermark, 1:1"
+        ),
+        "alt": "Labeled comparison of C3 and C4 leaf cross-sections. C4 has prominent bundle-sheath cells surrounding the vascular bundle (Kranz anatomy), which C3 lacks.",
+    },
+    {
+        "type": "chart",
+        "content": json.dumps({
+            "kind": "bar",
+            "title": "Radiation use efficiency (g biomass per MJ PAR)",
+            "labels": ["C3 (wheat)", "C4 (maize)", "CAM (agave)"],
+            "values": [1.2, 1.7, 2.5],
+        }),
+        "alt": "Bar chart comparing radiation use efficiency: C3 wheat ~1.2, C4 maize ~1.7, CAM agave ~2.5 grams of biomass per megajoule of photosynthetically active radiation.",
+    },
 ]
 
 
 def demo_llm_fn(prompt: str, slot_index: int = 0) -> dict:
-    """Cycle through DEMO_SPECS regardless of prompt. Real LLM would read
-    the prose and pick. We just demonstrate the wiring."""
     return DEMO_SPECS[slot_index % len(DEMO_SPECS)]
 
 
 def main() -> int:
-    # 0. ensure mermaid bundle
     mermaid_ensure_local()
-    print(f"[1/5] mermaid bundle ready")
+    print("[1/5] mermaid bundle ready")
 
-    # 1. read source
-    src_md = (SRC / "ch01.md").read_text()
+    src_path = SRC / "ch01.md"
+    src_md = src_path.read_text()
     print(f"[2/5] source chapter: {len(src_md.split())} words")
 
-    # 2. inject diagrams — wrap the demo llm_fn with slot-index state
+    cost_log: list = []
+    api_key = os.environ.get("OPENROUTER_API_KEY") or _extract_key()
+
     state = {"i": 0}
     def llm(prompt: str) -> dict:
         s = DEMO_SPECS[state["i"] % len(DEMO_SPECS)]
         state["i"] += 1
         return s
 
-    cost_log = []
-    api_key = os.environ.get("OPENROUTER_API_KEY") or _extract_key()
-    try:
-        augmented, summary = inject_diagrams(
-            src_md, every=3, llm_fn=llm, api_key=api_key, cost_log=cost_log,
-        )
-    except Exception as e:
-        print(f"  WARN: image slot failed ({e}); continuing with mermaid+chart only")
-        # remove the image spec, retry
-        for s in DEMO_SPECS:
-            if s["type"] == "image":
-                s["type"] = "chart"
-                s["content"] = json.dumps({
-                    "kind": "bar",
-                    "title": "Photosystem distribution (relative)",
-                    "labels": ["PSII grana", "PSI stroma", "ATP synthase", "RuBisCO"],
-                    "values": [70, 50, 30, 100],
-                })
-                s["alt"] = "Relative abundance of key photosynthetic proteins."
-        state["i"] = 0
-        augmented, summary = inject_diagrams(
-            src_md, every=3, llm_fn=llm, api_key=None, cost_log=cost_log,
-        )
+    augmented, summary = inject_diagrams(
+        src_md, every=2, llm_fn=llm, api_key=api_key, cost_log=cost_log,
+    )
+    aug_path = SRC / "ch01.augmented.md"
+    aug_path.write_text(augmented)
+    print(f"[3/5] injected {summary['slots']} diagrams: {summary['by_type']} -> {aug_path.name}")
 
-    (SRC / "ch01.md").write_text(augmented)
-    print(f"[3/5] injected {summary['slots']} diagrams: {summary['by_type']}")
-
-    # 3. build html
     out_html = str(OUT_HTML)
-    import subprocess
+    # Build the HTML from a build dir containing the AUGMENTED chapter
+    # (so the <figure> blocks survive) plus meta.json + references.md
+    # copied from the clean source dir.
+    import shutil
+    build_dir = SRC / "_build"
+    build_dir.mkdir(exist_ok=True)
+    shutil.copy(aug_path, build_dir / "ch01.md")
+    for sidecar in ("meta.json", "references.md"):
+        src_side = SRC / sidecar
+        if src_side.exists():
+            shutil.copy(src_side, build_dir / sidecar)
     res = subprocess.run(
         ["python3", str(SKILL / "scripts" / "build.py"),
-         str(SRC), str(SKILL / "templates"), out_html],
+         str(build_dir), str(SKILL / "templates"), out_html],
         capture_output=True, text=True,
     )
     if res.returncode != 0:
@@ -152,23 +166,20 @@ def main() -> int:
         return 1
     print(f"[4/5] built: {out_html}")
 
-    # 4. validate
     res = subprocess.run(
         ["python3", str(SKILL / "scripts" / "validate.py"), out_html],
         capture_output=True, text=True,
     )
     print(f"[5/5] validate: {res.stdout.strip()}")
 
-    # 5. cost report
     print_cost_report(cost_log, summary)
-
     return 0
 
 
 def print_cost_report(cost_log: list, summary: dict) -> None:
     print()
     print("=" * 60)
-    print("COST REPORT")
+    print("COST REPORT (v1.1 demo)")
     print("=" * 60)
     by_model: dict = summary.get("usage_by_model", {})
     if not by_model:

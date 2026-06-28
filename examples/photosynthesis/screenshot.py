@@ -1,17 +1,30 @@
-"""Capture a full-page screenshot of the built demo HTML."""
-import sys
+"""Screenshot the demo HTML for visual verification.
+
+Writes examples/photosynthesis/photosynthesis.png (full page) and
+photosynthesis_top.png (above-the-fold).
+"""
+import asyncio
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
-html = Path(sys.argv[1]).resolve()
-out = Path(sys.argv[2]).resolve()
-out.parent.mkdir(parents=True, exist_ok=True)
+ROOT = Path(__file__).resolve().parent
+HTML = ROOT / "photosynthesis.html"
+PNG_FULL = ROOT / "photosynthesis.png"
+PNG_TOP = ROOT / "photosynthesis_top.png"
 
-with sync_playwright() as p:
-    browser = p.chromium.launch()
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.goto(f"file://{html}")
-    page.wait_for_load_state("networkidle")
-    page.screenshot(path=str(out), full_page=True)
-    browser.close()
-print(f"screenshot: {out}")
+
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={"width": 1280, "height": 900})
+        await page.goto(f"file://{HTML}")
+        await page.wait_for_load_state("networkidle")
+        await page.screenshot(path=str(PNG_TOP), full_page=False)
+        await page.screenshot(path=str(PNG_FULL), full_page=True)
+        await browser.close()
+    print(f"wrote: {PNG_TOP}")
+    print(f"wrote: {PNG_FULL}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -33,9 +33,16 @@ Build a redesigned version of teach-html as a standalone opencode skill with edi
 - INR cost report per model × per generation.
 
 ## Status
-- P0: in progress
-- P1: pending
-- P2: pending
-- P3: pending
-- P4: pending
-- P5: pending
+- P0: done
+- P1: done
+- P2: done
+- P3: done
+- P4: done
+- P5: done
+
+## v1.1 update (post-interview)
+- P2 now defaults to every=2 paragraphs (was 3) — visual-leaning density.
+- Image style suffix changed: labels and callouts now ENCOURAGED (was: "no text, no labels"). Journal-figure style.
+- New agents teach-html-opencode-{outliner,author} (replaced teach-html-*).
+- Author style: tables and bullet lists first, prose connects and explains.
+- 58/58 tests green. End-to-end demo: 2 image API calls = 11.27 INR total.

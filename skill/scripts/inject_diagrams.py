@@ -113,16 +113,18 @@ def _build_pick_prompt(slot: Slot) -> str:
 
         Types:
         - "mermaid": write valid Mermaid syntax (flowchart, sequence, mindmap, timeline, etc.)
-        - "image":   a 1-sentence prompt for an educational illustration. Follow
-                     the IMAGE style rules below — single concept, no text in image,
-                     consistent flat 2D editorial style.
+        - "image":   a 1-sentence prompt for an editorial-medical illustration.
+                     LABELS ARE ENCOURAGED: name parts, add callouts, use arrows
+                     with text, label axes. This is a journal-figure, not a stock photo.
+                     Single concept, consistent flat 2D style — see suffix below.
         - "chart":   JSON {{"kind": "bar|line|pie", "title": "...", "labels": [...], "values": [...]}}
 
         IMAGE STYLE RULES (apply to every image spec):
-        - One concept per image, named in the prompt (e.g. "a mitochondrion", not "a cell scene")
+        - One concept per image, named in the prompt (e.g. "a mitochondrion with labeled cristae", not "a cell scene")
+        - ENCOURAGED: callouts, named parts, arrows with text, axis labels, legend entries
+        - AVOID: photorealism, complex backgrounds, multiple competing subjects
         - Append the fixed suffix: "{_IMAGE_STYLE_SUFFIX}"
-        - Specify the visual focus: shape, structure, key labels-as-prose (not text-on-image)
-        - Subject first, then style, then suffix
+        - Subject first, then any specific labels, then the style suffix
 
         Reply with ONLY valid JSON: {{"type": "...", "content": "...", "alt": "..."}}
 
@@ -307,7 +309,7 @@ def _chart_line(labels, values) -> str:
     pts = []
     for i, v in enumerate(values):
         x = x0 + (x1 - x0) * (i / (len(values) - 1))
-        y = y1 + (y0 - y1) * ((v - minv) / rng)
+        y = y0 - (y0 - y1) * ((v - minv) / rng)
         pts.append(f"{x:.1f},{y:.1f}")
     polyline = " ".join(pts)
     dots = "".join(
@@ -364,12 +366,16 @@ def _chart_pie(labels, values) -> str:
 def inject_diagrams(
     md: str,
     *,
-    every: int = 3,
+    every: int = 2,
     llm_fn: Optional[Callable[[str], dict]] = None,
     api_key: Optional[str] = None,
     cost_log: Optional[list] = None,
 ) -> tuple[str, dict]:
     """Slot diagrams into markdown. Returns (new_md, cost_summary).
+
+    Default `every=2` (v1.1) yields ~one diagram per two paragraphs — a
+    visual-leaning, editorial-medical density. v0/v1 used 3; override here
+    for text-heavy chapters.
 
     `llm_fn` is required (or pass a stub). For real use, wrap
     `openrouter_chat(model=...)` and pass it in.
@@ -427,12 +433,13 @@ def _esc(s: str) -> str:
 
 
 # Fixed style suffix appended to every image-generation prompt. Keeps all
-# diagrams visually consistent (flat 2D editorial line art, no text, no
-# watermark, white background). Tuned for gemini-3.1-flash-image-preview.
-# See docs/IMAGE_PROMPTING.md for derivation.
+# diagrams visually consistent (flat 2D editorial line art, white background,
+# consistent strokes) while ENCOURAGING labels for journal-figure style.
+# v1.1: dropped the strict "no text, no labels, no letters" rule — labels
+# and callouts are now first-class citizens. See docs/IMAGE_PROMPTING.md.
 _IMAGE_STYLE_SUFFIX = (
-    "flat 2D editorial illustration, no text, no labels, no letters, no "
-    "watermark, no background detail, white background, 1:1"
+    "flat 2D editorial medical illustration, labeled diagram with named "
+    "parts and callouts, clean line art, white background, no watermark, 1:1"
 )
 
 
@@ -464,7 +471,7 @@ if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument("chapter_md")
-    p.add_argument("--every", type=int, default=3)
+    p.add_argument("--every", type=int, default=2)
     p.add_argument("--out", default="-")
     args = p.parse_args()
     md = open(args.chapter_md).read()

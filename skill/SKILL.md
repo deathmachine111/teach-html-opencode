@@ -1,11 +1,11 @@
 ---
 name: teach-html-opencode
-description: Build single-file HTML pedagogical modules from textbook excerpts, research papers, or pasted source, with auto-injected diagrams every 3 paragraphs. Pipeline = ingest sources to markdown → outliner designs chapter architecture → author writes each chapter section-by-section with citations → diagram injector (build-time LLM picks type: mermaid / generated image / chart) → coder compiles to one self-contained inlined HTML (CSS/JS/images embedded) → structural validation. Aesthetic: Nature-style editorial-medical (slate #F8FAFC + deep green #166534). Target ~900 words/chapter. Model-routed: outline=glm-5.2, author+citations=deepseek-v4-flash, HTML/CSS/JS=minimax-m3. Use when the user wants to turn a PDF/DOCX/MD/paper/textbook chapter into a polished, shareable, citation-tracked HTML learning module with diagrams. Triggers: "make an HTML module", "turn this into a teachable HTML", "build a course module from this", "/teach-html-opencode".
+description: Build single-file HTML pedagogical modules from textbook excerpts, research papers, or pasted source, with auto-injected diagrams every 2 paragraphs. Pipeline = ingest sources to markdown → outliner designs chapter architecture (v1.1: plan tables+lists first) → author writes each chapter as 2-paragraph doublets (tables+bullets primary, prose connecting) → diagram injector (build-time LLM picks type: mermaid / generated labeled image / chart) → coder compiles to one self-contained inlined HTML (CSS/JS/images embedded) → structural validation. Aesthetic: Nature-style editorial-medical (slate #F8FAFC + deep green #166534, labeled journal figures). Target ~900 words/chapter. Model-routed: outline=glm-5.2, author+citations=deepseek-v4-flash, HTML/CSS/JS=minimax-m3. Use when the user wants to turn a PDF/DOCX/MD/paper/textbook chapter into a polished, shareable, citation-tracked HTML learning module with diagrams. Triggers: "make an HTML module", "turn this into a teachable HTML", "build a course module from this", "/teach-html-opencode".
 ---
 
-# /teach-html-opencode — Pedagogical HTML Module Builder
+# /teach-html-opencode — Pedagogical HTML Module Builder (v1.1)
 
-Turn source material (PDF / DOCX / MD / paper / textbook excerpt / paste) into a single self-contained, citation-tracked, editorial-quality HTML learning module with **auto-injected diagrams** every ~3 paragraphs.
+Turn source material (PDF / DOCX / MD / paper / textbook excerpt / paste) into a single self-contained, citation-tracked, editorial-quality HTML learning module with **auto-injected diagrams every 2 paragraphs**. v1.1 emphasizes **tables and bullet lists as primary content** (prose connects them) and **labeled journal-figure style** for generated images.
 
 **Strategy B (md→build):** authors write markdown chapters; a deterministic build script compiles them into one inlined HTML. Cheapest (md tokens), debuggable (readable source), shareable (single file, no hosting), reproducible.
 
@@ -16,6 +16,7 @@ Turn source material (PDF / DOCX / MD / paper / textbook excerpt / paste) into a
 - **Feel:** Nature / NEJM / Lancet — clean scientific restraint, hairline rules, italic captions, light-green tinted blockquotes, framed figures with captions underneath.
 - **Reading width:** 72ch. Sidebar 260px TOC with sticky scrollspy.
 - **Figures:** all diagrams (mermaid / image / chart) wrapped in `<figure class="diagram">` with a captioned `<figcaption>`. Mermaid baked to SVG at build time; image gen via gemini-3.1-flash-image-preview; charts as inline CSS/SVG primitives (no JS).
+- **v1.1 image style:** gemini-generated images are encouraged to include **labels, callouts, named parts, arrows with text** — journal-figure style, not stock photos. Visual consistency comes from flat 2D + white background + clean line art, not from stripping text.
 
 ## Paths
 
@@ -64,7 +65,7 @@ Spawn `teach-html-opencode-outliner` (task tool). Give it:
 - The user's learning objectives and audience level
 - Instruction: write `meta.json`, `outline.md`, and seed `references.md` to `teach-html-src/`.
 
-It returns the chapter plan. Review: are the chapters sensibly sized (target **~900 words each**)? Are citation keys real? Adjust if needed.
+It returns the chapter plan. Review: are the chapters sensibly sized (target **~900 words each**)? Are citation keys real? Does the plan include at least one table or bulleted list per doublet? Adjust if needed.
 
 ### Stage 2 — Author Each Chapter
 
@@ -73,7 +74,7 @@ For each `chNN.md` in the outline, spawn `teach-html-opencode-author` (task tool
 - The source excerpt(s) it maps to
 - The current `references.md`
 
-**Chapter triplet structure:** each chapter is written as 3-paragraph triplets. The diagram injector will mark a slot after every 3 paragraphs and ask the LLM to pick the right diagram type. Authors should write prose that **justifies** a diagram at each triplet boundary (a concept map, an illustration, or a small data chart).
+**Chapter structure (v1.1):** each chapter is written as **2-paragraph doublets** with **tables and bullet lists as primary content** (prose connects them). The diagram injector marks a slot after every 2 paragraphs. Authors should plan at least one table or list per doublet and write prose that **justifies** a diagram at each boundary. Every table needs a header row; every list needs a one-line lead.
 
 **Parallelize:** chapters are independent — spawn multiple author tasks concurrently when the outline has 3+ chapters and sources don't overlap heavily. Each writes its own `chNN.md`. After each returns, check it appended any new citation keys to `references.md` and merge (authors append-only; reconcile duplicates).
 
@@ -101,7 +102,7 @@ def llm_fn(prompt: str) -> dict:
 
 augmented, summary = inject_diagrams(
     md,
-    every=3,                  # one diagram per triplet
+    every=2,                  # one diagram per doublet (v1.1 default)
     llm_fn=llm_fn,            # chooses {mermaid|image|chart} per slot
     api_key=os.environ["OPENROUTER_API_KEY"],
     cost_log=[],              # accumulate usage per model
@@ -109,7 +110,7 @@ augmented, summary = inject_diagrams(
 open("teach-html-src/ch01.md", "w").write(augmented)
 ```
 
-- `every=3` controls slot density. Set lower (e.g. 2) for visual-heavy chapters, higher (e.g. 4) for text-heavy ones.
+- `every=2` (v1.1 default) controls slot density. Set higher (e.g. 3-4) for text-heavy chapters, lower (e.g. 1) for visual-heavy ones.
 - `summary["usage_by_model"]` returns `{model: {prompt_tokens, completion_tokens, cost_usd}}`. For INR cost, multiply USD by ~83.
 - Mermaid rendering requires `~/.cache/teach-html/mermaid.min.js`. Run `inject_diagrams.mermaid_ensure_local()` once to download it.
 - Image rendering needs `OPENROUTER_API_KEY` in env.
@@ -132,7 +133,7 @@ python3 skill/scripts/validate.py <project>/<module-name>.html
 ### Stage 6 — Verify + Deliver
 
 1. **Structural validation** — `validate.py` must report `OK: structurally valid`.
-2. **Test suite** — `python3 -m pytest skill/tests/` must pass (47 tests: split/mark/pick/render/inject + build + validate + citations).
+2. **Test suite** — `python3 -m pytest skill/tests/` must pass (57 tests: split/mark/pick/render/inject + build + validate + citations + agent content).
 3. **Cost report** — sum `cost_log` entries per model, convert USD→INR, print as a table.
 4. **Spot-check** — open the HTML (or use `webapp-testing` / browser skill) and confirm: TOC scrollspy works, headings anchor, images render, bibliography lists only cited works, no broken layout.
 5. **Deliver** — report the path to the single `.html` file. Remind the user it is fully self-contained (email it, host it, or open locally — no dependencies).
@@ -142,9 +143,11 @@ python3 skill/scripts/validate.py <project>/<module-name>.html
 ## Conventions
 
 - **Chapter files:** `ch01.md`, `ch02.md`, ... zero-padded, `ch` prefix. One H1 each. The build script picks these up by regex `ch\d`.
-- **Chapter length:** target ~900 words. Structure as 3-paragraph triplets so the diagram injector has predictable slots.
+- **Chapter length:** target ~900 words. Structure as 2-paragraph doublets (v1.1) so the diagram injector has predictable slots.
+- **Writing style (v1.1):** tables and bullet lists are primary content; prose connects and explains. Plan at least one table or list per doublet. Tables have a header row; lists have a one-line lead.
 - **Citations:** pandoc-style `[@Key]`, `[@Key, p. 12]`, `[@Key1; @Key2]`. References in `references.md` as `[Key]: entry`.
-- **Diagrams (post-inject):** the injector inserts `<figure class="diagram">` blocks after every 3 paragraphs. Authors do not write diagrams by hand.
+- **Diagrams (post-inject):** the injector inserts `<figure class="diagram">` blocks after every 2 paragraphs (v1.1 default). Authors do not write diagrams by hand.
+- **Image style (v1.1):** gemini-generated images are encouraged to include labels, callouts, named parts, arrows with text — journal-figure style. Authors do not need to specify this; the image style suffix bakes it in.
 - **Images:** `![caption](file.png)` — file lives in `teach-html-src/`, inlined as data URI at build time. (For generated diagrams, the image is a data URI returned by the image model and already inlined.)
 - **Bibliography:** auto-generated, cited-works-only, sorted by key. Appears as the final `<section id="references">`.
 - **Single output:** one `.html`, CSS/JS/images inlined. No external links survive the build.

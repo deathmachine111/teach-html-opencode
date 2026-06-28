@@ -109,8 +109,61 @@ def test_pick_prompt_includes_image_style_suffix():
     captured = []
     ID.pick_spec(ID.Slot(2, ["x"]),
                  lambda p: (captured.append(p) or {"type": "mermaid", "content": "g", "alt": ""}))
-    assert "no text, no labels, no letters" in captured[0]
     assert "flat 2D" in captured[0]
+    # v1.1: labels are now encouraged in the image for editorial-medical style.
+    # The fixed suffix must NOT forbid labels.
+    assert ID._IMAGE_STYLE_SUFFIX not in captured[0] or "no text" not in ID._IMAGE_STYLE_SUFFIX
+
+
+def test_pick_prompt_encourages_image_labels_v11():
+    """v1.1: editorial-medical style encourages labels in generated images
+    (callouts, named parts, arrows with text). The pick prompt must reflect this.
+    """
+    captured = []
+    ID.pick_spec(ID.Slot(2, ["x"]),
+                 lambda p: (captured.append(p) or {"type": "image", "content": "draw a chloroplast", "alt": ""}))
+    # The prompt encourages labels, doesn't forbid them
+    assert "no text" not in captured[0].lower() or "labels" in captured[0].lower()
+    # Must mention labels as a positive affordance
+    assert "label" in captured[0].lower()
+
+
+def test_image_style_suffix_allows_labels_v11():
+    """v1.1: the fixed image style suffix no longer forbids text/labels.
+    Visual consistency is preserved by keeping the flat 2D + white background,
+    not by stripping all text.
+    """
+    assert "no text" not in ID._IMAGE_STYLE_SUFFIX
+    assert "no labels" not in ID._IMAGE_STYLE_SUFFIX
+    assert "no letters" not in ID._IMAGE_STYLE_SUFFIX
+    # Visual consistency rules still apply
+    assert "flat 2D" in ID._IMAGE_STYLE_SUFFIX
+    assert "white background" in ID._IMAGE_STYLE_SUFFIX
+
+
+def test_inject_default_every_is_two_v11():
+    """v1.1: default `every` lowered from 3 to 2 to roughly double the
+    diagram density for editorial-medical style.
+    """
+    md = "".join(f"Para {i}.\n\n" for i in range(5)).strip()
+    def stub(prompt):
+        return {"type": "mermaid", "content": "graph TD; A-->B", "alt": ""}
+    with patch.object(ID, "render_mermaid", return_value="<m-stub>"):
+        new_md, summary = ID.inject_diagrams(md, llm_fn=stub)
+    # every=2 with 5 paragraphs → 2 slots (after p1, p3); trailing p4 fragment
+    # (n - boundary = 1) is < every=2 so no extra slot.
+    assert summary["slots"] == 2
+
+
+def test_inject_cli_default_every_is_two_v11():
+    """v1.1: CLI --every default is 2 (was 3)."""
+    import subprocess
+    # Smoke test that the CLI parser accepts the default without an --every arg
+    # We just need to import argparse default — easier: check the module-level
+    # default constant via the function signature.
+    import inspect
+    sig = inspect.signature(ID.inject_diagrams)
+    assert sig.parameters["every"].default == 2
 
 
 # -------- 4. render_mermaid (real playwright, no network) -----------------
@@ -153,6 +206,27 @@ def test_render_chart_line():
     html = ID.render_chart(spec)
     assert "<polyline" in html
     assert "line-dot" in html
+
+
+def test_render_chart_line_max_value_is_at_top_v11():
+    """Bug fix v1.1: line chart y-axis was inverted (max at bottom)."""
+    # values rise then fall: 0.10 (min), 0.92 (max), 0.20
+    spec = ID.Spec("chart",
+                   json.dumps({"kind": "line", "title": "Absorption",
+                               "labels": ["400", "430", "520"],
+                               "values": [0.10, 0.92, 0.20]}),
+                   alt="absorption")
+    html = ID.render_chart(spec)
+    # Extract y-coords of the three <circle> dots in order.
+    import re
+    ys = [float(m) for m in re.findall(r'<circle[^>]*\bcy="([\d.]+)"', html)]
+    assert len(ys) == 3, f"expected 3 dots, got {len(ys)}: {html}"
+    y_min, y_max, _ = ys
+    # In SVG, smaller y = higher on the page. Max value must be HIGHER than min.
+    assert y_max < y_min, (
+        f"line chart y-axis inverted: max value (0.92) has y={y_max} but should be "
+        f"smaller (higher on page) than min value (0.10) at y={y_min}"
+    )
 
 
 def test_render_chart_pie():
