@@ -113,8 +113,16 @@ def _build_pick_prompt(slot: Slot) -> str:
 
         Types:
         - "mermaid": write valid Mermaid syntax (flowchart, sequence, mindmap, timeline, etc.)
-        - "image":   a 1-sentence prompt for an educational illustration (schematic, low-detail, line-art preferred)
+        - "image":   a 1-sentence prompt for an educational illustration. Follow
+                     the IMAGE style rules below — single concept, no text in image,
+                     consistent flat 2D editorial style.
         - "chart":   JSON {{"kind": "bar|line|pie", "title": "...", "labels": [...], "values": [...]}}
+
+        IMAGE STYLE RULES (apply to every image spec):
+        - One concept per image, named in the prompt (e.g. "a mitochondrion", not "a cell scene")
+        - Append the fixed suffix: "{_IMAGE_STYLE_SUFFIX}"
+        - Specify the visual focus: shape, structure, key labels-as-prose (not text-on-image)
+        - Subject first, then style, then suffix
 
         Reply with ONLY valid JSON: {{"type": "...", "content": "...", "alt": "..."}}
 
@@ -416,6 +424,16 @@ def _splice(paragraphs: list[str], rendered: list[tuple[int, str]]) -> str:
 def _esc(s: str) -> str:
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
              .replace('"', "&quot;").replace("'", "&#39;"))
+
+
+# Fixed style suffix appended to every image-generation prompt. Keeps all
+# diagrams visually consistent (flat 2D editorial line art, no text, no
+# watermark, white background). Tuned for gemini-3.1-flash-image-preview.
+# See docs/IMAGE_PROMPTING.md for derivation.
+_IMAGE_STYLE_SUFFIX = (
+    "flat 2D editorial illustration, no text, no labels, no letters, no "
+    "watermark, no background detail, white background, 1:1"
+)
 
 
 # Mermaid.js is loaded from a locally-cached file at render time. Download once:

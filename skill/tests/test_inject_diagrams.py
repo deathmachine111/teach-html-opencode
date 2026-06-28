@@ -102,6 +102,17 @@ def test_pick_spec_accepts_string_json():
     assert spec.type == "chart"
 
 
+def test_pick_prompt_includes_image_style_suffix():
+    """Pick prompt must instruct the LLM to append the fixed style suffix
+    to image specs, so every generated image shares the same visual style.
+    """
+    captured = []
+    ID.pick_spec(ID.Slot(2, ["x"]),
+                 lambda p: (captured.append(p) or {"type": "mermaid", "content": "g", "alt": ""}))
+    assert "no text, no labels, no letters" in captured[0]
+    assert "flat 2D" in captured[0]
+
+
 # -------- 4. render_mermaid (real playwright, no network) -----------------
 
 def test_render_mermaid_smoke():
