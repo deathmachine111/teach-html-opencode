@@ -1,0 +1,52 @@
+/* teach-html — editorial/academic stylesheet (minimal, expanded in design-system) */
+:root{
+  --ink:#1a1a1a; --paper:#fdfcf8; --rule:#e2ddd0; --muted:#6b6358;
+  --accent:#7a4b2a; --accent-soft:#f3ece1; --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:-apple-system,"Segoe UI",Roboto,system-ui,sans-serif; --mono:"SF Mono",Menlo,Consolas,monospace;
+  --maxw:72ch; --side:240px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);line-height:1.65;font-size:17px}
+.page{display:grid;grid-template-columns:var(--side) 1fr;min-height:100vh}
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:2rem 1.25rem;border-right:1px solid var(--rule);background:var(--accent-soft);font-family:var(--sans);font-size:.85rem}
+.toc-brand{font-weight:700;color:var(--accent);margin-bottom:1.25rem;line-height:1.3}
+.toc-nav{display:flex;flex-direction:column;gap:.15rem}
+.toc-nav a{color:var(--muted);text-decoration:none;padding:.18rem .35rem;border-radius:3px;border-left:2px solid transparent;transition:.15s}
+.toc-nav a:hover{color:var(--ink);background:rgba(0,0,0,.04)}
+.toc-nav a.active{color:var(--accent);border-left-color:var(--accent);font-weight:600;background:rgba(122,75,42,.08)}
+.toc-l1{font-weight:600;margin-top:.5rem}
+.toc-l2{padding-left:1rem}
+.toc-l3{padding-left:2rem;font-size:.85em}
+.content{max-width:var(--maxw);margin:0 auto;padding:3.5rem 2.5rem 6rem}
+.masthead{border-bottom:2px solid var(--ink);padding-bottom:1.5rem;margin-bottom:2.5rem}
+.doc-title{font-size:2.4rem;line-height:1.15;margin:0 0 .5rem;letter-spacing:-.01em}
+.subtitle{font-size:1.15rem;color:var(--muted);font-style:italic;margin:.25rem 0 0}
+.byline{font-family:var(--sans);font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin:.6rem 0 0}
+.content h1{font-size:1.85rem;margin:2.5rem 0 1rem;padding-bottom:.3rem;border-bottom:1px solid var(--rule)}
+.content h2{font-size:1.4rem;margin:2rem 0 .8rem}
+.content h3{font-size:1.15rem;margin:1.5rem 0 .6rem;color:var(--accent)}
+.content p{margin:0 0 1.1rem}
+.content sup.cite{font-size:.7em;line-height:0}
+.content sup.cite a{color:var(--accent);text-decoration:none}
+.content sup.cite a:hover{text-decoration:underline}
+.content ul,.content ol{margin:0 0 1.1rem 1.5rem}
+.content li{margin-bottom:.4rem}
+.content img{max-width:100%;height:auto;border:1px solid var(--rule);margin:1rem 0}
+.content blockquote{border-left:3px solid var(--accent);margin:1.5rem 0;padding:.5rem 1.25rem;color:var(--muted);font-style:italic;background:var(--accent-soft)}
+.content code{font-family:var(--mono);font-size:.9em;background:rgba(0,0,0,.05);padding:.1em .35em;border-radius:3px}
+.content pre{background:#1e1e1e;color:#eee;padding:1rem 1.25rem;border-radius:6px;overflow-x:auto;font-size:.85rem;line-height:1.5}
+.content pre code{background:none;padding:0;color:inherit}
+.content table{border-collapse:collapse;width:100%;margin:1.5rem 0;font-size:.92rem}
+.content th,.content td{border:1px solid var(--rule);padding:.5rem .75rem;text-align:left}
+.content th{background:var(--accent-soft);font-family:var(--sans);font-weight:600}
+.bibliography{margin-top:3rem;padding-top:1.5rem;border-top:2px solid var(--ink)}
+.bibliography h2{font-size:1.3rem}
+.refs{font-size:.88rem;line-height:1.5;font-family:var(--sans)}
+.ref{padding:.3rem 0;border-bottom:1px dotted var(--rule)}
+@media (max-width:760px){
+  .page{grid-template-columns:1fr}
+  .toc{position:relative;height:auto;border-right:none;border-bottom:1px solid var(--rule)}
+  .content{padding:2rem 1.25rem 4rem}
+}
+@media print{.toc{display:none}.content{max-width:none;padding:0}}

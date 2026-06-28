@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.cache/
+playwright-report/
+test-results/
+node_modules/
+*.log
+.DS_Store
+.env
