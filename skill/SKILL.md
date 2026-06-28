@@ -21,7 +21,7 @@ Turn source material (PDF / DOCX / MD / paper / textbook excerpt / paste) into a
 
 - Scripts: `skill/scripts/` (`ingest.py`, `build.py`, `validate.py`, `citations.py`, `inject_diagrams.py`)
 - Templates: `skill/templates/` (`module.css`, `module.js`)
-- Agents: `teach-html-outliner`, `teach-html-author`, `teach-html-coder` (in `~/.config/opencode/agents/`)
+- Agents: `teach-html-opencode-outliner`, `teach-html-opencode-author`, `teach-html-opencode-coder` (in `~/.config/opencode/agents/`)
 - **Work directory:** create `<project>/teach-html-src/` per invocation. All `ch*.md`, `references.md`, `meta.json`, and image files live there.
 - **Mermaid bundle:** `~/.cache/teach-html/mermaid.min.js` (downloaded once via `inject_diagrams.mermaid_ensure_local()` — required for mermaid rendering).
 
@@ -29,9 +29,9 @@ Turn source material (PDF / DOCX / MD / paper / textbook excerpt / paste) into a
 
 | Stage | Agent | Model |
 |---|---|---|
-| Outline + architecture | `teach-html-outliner` | `opencode-go/glm-5.2` |
-| Chapter prose + citations | `teach-html-author` | `opencode-go/deepseek-v4-flash` |
-| HTML/CSS/JS build + tooling | `teach-html-coder` | `opencode-go/minimax-m3` |
+| Outline + architecture | `teach-html-opencode-outliner` | `opencode-go/glm-5.2` |
+| Chapter prose + citations | `teach-html-opencode-author` | `opencode-go/deepseek-v4-flash` |
+| HTML/CSS/JS build + tooling | `teach-html-opencode-coder` | `opencode-go/minimax-m3` |
 | Diagram spec picker (build-time) | embedded in `inject_diagrams.pick_spec` | user-supplied `llm_fn` |
 | Image generation (build-time) | `render_image` | `google/gemini-3.1-flash-image-preview` via openrouter |
 
@@ -59,7 +59,7 @@ Confirm all sources are markdown in `teach-html-src/` before proceeding.
 
 ### Stage 1 — Outline + Architecture
 
-Spawn `teach-html-outliner` (task tool). Give it:
+Spawn `teach-html-opencode-outliner` (task tool). Give it:
 - The list of ingested source files (paths)
 - The user's learning objectives and audience level
 - Instruction: write `meta.json`, `outline.md`, and seed `references.md` to `teach-html-src/`.
@@ -68,7 +68,7 @@ It returns the chapter plan. Review: are the chapters sensibly sized (target **~
 
 ### Stage 2 — Author Each Chapter
 
-For each `chNN.md` in the outline, spawn `teach-html-author` (task tool). Give it:
+For each `chNN.md` in the outline, spawn `teach-html-opencode-author` (task tool). Give it:
 - The chapter's outline section
 - The source excerpt(s) it maps to
 - The current `references.md`
@@ -117,7 +117,7 @@ open("teach-html-src/ch01.md", "w").write(augmented)
 
 ### Stage 5 — Build
 
-Spawn `teach-html-coder` (task tool). It runs `build.py` → produces `<project>/<module-name>.html`, then runs `validate.py`. If structural errors appear, it fixes the source (md or templates) and rebuilds until clean.
+Spawn `teach-html-opencode-coder` (task tool). It runs the inject_diagrams → build.py → validate.py pipeline, fixes any structural errors, and produces `<project>/<module-name>.html` plus a `cost_log` of per-model token usage.
 
 You can also build directly if no custom work is needed:
 
